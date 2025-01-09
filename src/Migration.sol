@@ -5,10 +5,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract ValiDAO is ERC20, Ownable {
-    constructor(string memory name, string memory symbol, IERC20 _oldToken) ERC20(name, symbol) Ownable(msg.sender) {
-        _mint(address(this), _oldToken.totalSupply());
-        _mint(msg.sender, _oldToken.totalSupply() * 2 / 10);
+contract ValiDAO is ERC20 {
+    constructor(string memory name, string memory symbol, IERC20 _oldToken, address deployer) ERC20(name, symbol) {
+        _mint(msg.sender, _oldToken.totalSupply());
+        _mint(deployer, _oldToken.totalSupply() * 2 / 10);
     }
 }
 
@@ -22,7 +22,7 @@ contract Migration is Ownable {
 
     constructor(address _oldToken, bool _bidirectional) Ownable(msg.sender) {
         oldToken = IERC20(_oldToken);
-        newToken = new ValiDAO("VDO", "ValiDAO", oldToken);
+        newToken = new ValiDAO("ValiDAO", "VDO", oldToken, msg.sender);
         bidirectional = _bidirectional;
     }
 
