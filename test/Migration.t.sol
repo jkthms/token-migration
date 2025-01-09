@@ -77,15 +77,34 @@ contract MigrationTest is Test {
     }
 
     function test_migrate() public {
-        uint256 initialBalance = oldToken.balanceOf(user);
+        uint256 userOldTokenBalance = oldToken.balanceOf(user);
+        uint256 userNewTokenBalance = newToken.balanceOf(user);
+        uint256 migrationOldTokenBalance = oldToken.balanceOf(address(migration));
+        uint256 migrationNewTokenBalance = newToken.balanceOf(address(migration));
 
+        // Check that the user can migrate forwards
         vm.startPrank(user);
         oldToken.approve(address(migration), 100);
         migration.migrate(100, true);
         vm.stopPrank();
 
-        assertEq(oldToken.balanceOf(user), initialBalance - 100);
-        assertEq(oldToken.balanceOf(address(migration)), 100);
+        // Check the accounting logic is 1:1
+        assertEq(oldToken.balanceOf(user), userOldTokenBalance - 100);
+        assertEq(oldToken.balanceOf(address(migration)), migrationOldTokenBalance + 100);
+        assertEq(newToken.balanceOf(user), userNewTokenBalance + 100);
+        assertEq(newToken.balanceOf(address(migration)), migrationNewTokenBalance - 100);
+
+        // Check that the user can also migrate backwards
+        vm.startPrank(user);
+        newToken.approve(address(migration), 50);
+        migration.migrate(50, false);
+        vm.stopPrank();
+
+        // Check the accounting logic is 1:1
+        assertEq(oldToken.balanceOf(user), userOldTokenBalance - 50);
+        assertEq(newToken.balanceOf(user), userNewTokenBalance + 50);
+        assertEq(oldToken.balanceOf(address(migration)), migrationOldTokenBalance + 50);
+        assertEq(newToken.balanceOf(address(migration)), migrationNewTokenBalance - 50);
     }
 
     function test_migrate_Bidirectional() public {
