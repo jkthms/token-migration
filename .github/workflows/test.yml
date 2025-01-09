@@ -2,7 +2,11 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 env:
@@ -13,7 +17,7 @@ jobs:
     strategy:
       fail-fast: true
 
-    name: Foundry project
+    name: Foundry Workflow
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,21 +27,21 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Show Forge version
+      - name: Show Foundry Version
         run: |
           forge --version
 
-      - name: Run Forge fmt
+      - name: Format Code
         run: |
           forge fmt --check
         id: fmt
 
-      - name: Run Forge build
+      - name: Compile Contracts
         run: |
           forge build --sizes
         id: build
 
-      - name: Run Forge tests
+      - name: Run Unit Tests
         run: |
           forge test -vvv
         id: test
