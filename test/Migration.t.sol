@@ -81,6 +81,26 @@ contract MigrationTest is Test {
         assertEq(newToken.balanceOf(address(migration)), 80 * 1e18);
     }
 
+    function test_initializedModifier_toggleMigrationDirection() public {
+        // Toggle the migration direction pre-initialization, expect revert
+        vm.startPrank(owner);
+        vm.expectRevert("Migration contract is not initialized yet");
+        migration.toggleMigrationDirection(false);
+        vm.stopPrank();
+
+        // Initialize the contract migrations
+        vm.startPrank(owner);
+        migration.initialize(address(oldToken), address(newToken), true);
+        vm.stopPrank();
+
+        // Toggle the migration direction, expect success
+        vm.startPrank(owner);
+        migration.toggleMigrationDirection(false);
+        vm.stopPrank();
+
+        assertEq(migration.bidirectional(), false);
+    }
+
     function test_toggleMigrationDirection() public {
         // Initialize the contract migrations
         vm.startPrank(owner);
