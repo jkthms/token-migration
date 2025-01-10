@@ -28,8 +28,16 @@ contract Migration is Ownable {
         _;
     }
 
-    function initialize(address _oldToken, address _newToken, bool _bidirectional) external onlyOwner {
+    modifier isNotInitialized() {
         require(!initialized, "Migration contract is already initialized");
+        _;
+    }
+
+    function initialize(address _oldToken, address _newToken, bool _bidirectional)
+        external
+        onlyOwner
+        isNotInitialized
+    {
         oldToken = IERC20(_oldToken);
         newToken = IERC20(_newToken);
         bidirectional = _bidirectional;
