@@ -62,11 +62,11 @@ contract Migration is Ownable {
         emit Migrated(msg.sender, forward, amount);
     }
 
-    function withdrawAll(IERC20 token) external onlyOwner {
+    function withdrawToken(IERC20 token) external onlyOwner {
         require(token.transfer(msg.sender, token.balanceOf(address(this))), "Withdrawal failed of token failed");
     }
 
-    function withdrawNative() external onlyOwner {
+    function withdrawNativeToken() external onlyOwner {
         (bool success,) = msg.sender.call{value: address(this).balance}("");
         require(success, "Withdrawal failed of native token failed");
     }
