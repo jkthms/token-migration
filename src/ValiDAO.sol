@@ -17,7 +17,10 @@ contract ValiDAO is Initializable, ERC20Upgradeable, OwnableUpgradeable {
         _disableInitializers();
     }
 
-    function initialize(string memory name, string memory symbol, address treasury, uint256 totalSupply) public initializer {
+    function initialize(string memory name, string memory symbol, address treasury, uint256 totalSupply)
+        public
+        initializer
+    {
         __ERC20_init(name, symbol);
         __Ownable_init(msg.sender);
         _mint(treasury, totalSupply);
