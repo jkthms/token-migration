@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {Migration, ValiDAO} from "../src/Migration.sol";
+import {Migration} from "../src/Migration.sol";
 import {MockERC20} from "../src/mock/MockERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -10,7 +10,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract MigrationTest is Test {
     Migration public migration;
     MockERC20 public oldToken;
-    ValiDAO public newToken;
+    MockERC20 public newToken;
     address public owner;
     address public user;
 
@@ -20,39 +20,93 @@ contract MigrationTest is Test {
 
         vm.startPrank(owner);
         oldToken = new MockERC20();
-        migration = new Migration(address(oldToken), true);
-        newToken = migration.newToken();
+        newToken = new MockERC20();
+        migration = new Migration();
 
-        // Send some V1 tokens to the user for testing
+        // Send tokens to various parties for testing
         oldToken.transfer(user, 100 * 1e18);
+        newToken.transfer(address(migration), 100 * 1e18);
         vm.stopPrank();
     }
 
-    function test_newToken() public {
-        assertEq(newToken.name(), "ValiDAO");
-        assertEq(newToken.symbol(), "VDO");
-        assertEq(newToken.decimals(), 18);
+    function test_initialize() public {
+        vm.startPrank(owner);
+        migration.initialize(address(oldToken), address(newToken), true);
+        vm.stopPrank();
+
+        // Check that the migration contract is initialized correctly
+        assertEq(migration.initialized(), true);
+        assertEq(address(migration.oldToken()), address(oldToken));
+        assertEq(address(migration.newToken()), address(newToken));
+        assertEq(migration.bidirectional(), true);
     }
 
     function test_deployMigration() public {
         // Test that the balances are as expected initially
         assertEq(oldToken.balanceOf(user), 100 * 1e18);
         assertEq(newToken.balanceOf(user), 0);
+        assertEq(oldToken.balanceOf(address(migration)), 0);
+        assertEq(newToken.balanceOf(address(migration)), 100 * 1e18);
 
         // Check that the owner of Migration is the owner
         assertEq(migration.owner(), owner);
+        assertEq(migration.initialized(), false);
+    }
 
-        // Check that the new token is minted correctly
-        uint256 totalSupply = oldToken.totalSupply();
-        assertEq(newToken.balanceOf(address(migration)), totalSupply);
-        assertEq(newToken.balanceOf(owner), totalSupply * 2 / 10);
+    function test_initializedModifier() public {
+        // Initializing the contract migrations should fail if the contract is not initialized
+        vm.startPrank(user);
+        oldToken.approve(address(migration), 100 * 1e18);
+        vm.expectRevert("Migration contract is not initialized yet");
+        migration.migrate(100 * 1e18, true);
+        vm.stopPrank();
+
+        // Initialize the contract migrations
+        vm.startPrank(owner);
+        migration.initialize(address(oldToken), address(newToken), true);
+        vm.stopPrank();
+
+        // User should now be able to migrate tokens
+        vm.startPrank(user);
+        oldToken.approve(address(migration), 20 * 1e18);
+        migration.migrate(20 * 1e18, true);
+        vm.stopPrank();
 
         // Check that the user has the correct amount of tokens
-        assertEq(oldToken.balanceOf(user), 100 * 1e18);
-        assertEq(newToken.balanceOf(user), 0);
+        assertEq(oldToken.balanceOf(user), 80 * 1e18);
+        assertEq(newToken.balanceOf(user), 20 * 1e18);
+
+        // Check that the migration contract has the correct amount of tokens
+        assertEq(oldToken.balanceOf(address(migration)), 20 * 1e18);
+        assertEq(newToken.balanceOf(address(migration)), 80 * 1e18);
+    }
+
+    function test_initializedModifier_toggleMigrationDirection() public {
+        // Toggle the migration direction pre-initialization, expect revert
+        vm.startPrank(owner);
+        vm.expectRevert("Migration contract is not initialized yet");
+        migration.toggleMigrationDirection(false);
+        vm.stopPrank();
+
+        // Initialize the contract migrations
+        vm.startPrank(owner);
+        migration.initialize(address(oldToken), address(newToken), true);
+        vm.stopPrank();
+
+        // Toggle the migration direction, expect success
+        vm.startPrank(owner);
+        migration.toggleMigrationDirection(false);
+        vm.stopPrank();
+
+        assertEq(migration.bidirectional(), false);
     }
 
     function test_toggleMigrationDirection() public {
+        // Initialize the contract migrations
+        vm.startPrank(owner);
+        migration.initialize(address(oldToken), address(newToken), true);
+        vm.stopPrank();
+
         bool currentDirection = migration.bidirectional();
 
         // Modify the direction to the opposite value
@@ -77,6 +131,11 @@ contract MigrationTest is Test {
     }
 
     function test_migrate() public {
+        // Initialize the contract migrations
+        vm.startPrank(owner);
+        migration.initialize(address(oldToken), address(newToken), true);
+        vm.stopPrank();
+
         uint256 userOldTokenBalance = oldToken.balanceOf(user);
         uint256 userNewTokenBalance = newToken.balanceOf(user);
         uint256 migrationOldTokenBalance = oldToken.balanceOf(address(migration));
@@ -108,6 +167,11 @@ contract MigrationTest is Test {
     }
 
     function test_migrate_Bidirectional() public {
+        // Initialize the contract migrations
+        vm.startPrank(owner);
+        migration.initialize(address(oldToken), address(newToken), true);
+        vm.stopPrank();
+
         // Modify the direction to be unidirectional
         vm.startPrank(owner);
         migration.toggleMigrationDirection(false);
@@ -127,5 +191,58 @@ contract MigrationTest is Test {
         vm.expectRevert("Backward migration is not permitted");
         migration.migrate(100, false);
         vm.stopPrank();
+    }
+
+    function test_withdrawToken() public {
+        // Initialize the contract migrations
+        vm.startPrank(owner);
+        migration.initialize(address(oldToken), address(newToken), true);
+        vm.stopPrank();
+
+        // Create and mint a random token
+        vm.startPrank(user);
+        MockERC20 randomToken = new MockERC20();
+        randomToken.transfer(address(migration), 500 * 1e18);
+        vm.stopPrank();
+
+        // Check that the random token is in the migration contract
+        assertEq(randomToken.balanceOf(address(migration)), 500 * 1e18);
+
+        // Withdraw the random token
+        vm.startPrank(owner);
+        migration.withdrawToken(randomToken);
+        vm.stopPrank();
+
+        // Check that the random token is in the owner's account
+        assertEq(randomToken.balanceOf(owner), 500 * 1e18);
+
+        // Check that the random token is no longer in the migration contract
+        assertEq(randomToken.balanceOf(address(migration)), 0);
+    }
+
+    function test_withdrawNativeToken() public {
+        // Initialize the contract migrations
+        vm.startPrank(owner);
+        migration.initialize(address(oldToken), address(newToken), true);
+        vm.stopPrank();
+
+        // Transfer native tokens to the migration contract
+        vm.startPrank(user);
+        vm.deal(address(migration), 1000 * 1e18);
+        vm.stopPrank();
+
+        // Check that the native token is in the migration contract
+        assertEq(address(migration).balance, 1000 * 1e18);
+
+        // Withdraw the native token
+        vm.startPrank(owner);
+        migration.withdrawNativeToken();
+        vm.stopPrank();
+
+        // Check that the native token is in the owner's account
+        assertEq(address(owner).balance, 1000 * 1e18);
+
+        // Check that the native token is no longer in the migration contract
+        assertEq(address(migration).balance, 0);
     }
 }
