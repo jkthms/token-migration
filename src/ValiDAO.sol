@@ -10,8 +10,9 @@ pragma solidity ^0.8.20;
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract ValiDAO is Initializable, ERC20Upgradeable, OwnableUpgradeable {
+contract ValiDAO is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -23,6 +24,10 @@ contract ValiDAO is Initializable, ERC20Upgradeable, OwnableUpgradeable {
     {
         __ERC20_init(name, symbol);
         __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+
         _mint(treasury, totalSupply);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
