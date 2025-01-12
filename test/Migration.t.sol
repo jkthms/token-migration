@@ -192,4 +192,57 @@ contract MigrationTest is Test {
         migration.migrate(100, false);
         vm.stopPrank();
     }
+
+    function test_withdrawToken() public {
+        // Initialize the contract migrations
+        vm.startPrank(owner);
+        migration.initialize(address(oldToken), address(newToken), true);
+        vm.stopPrank();
+
+        // Create and mint a random token
+        vm.startPrank(user);
+        MockERC20 randomToken = new MockERC20();
+        randomToken.transfer(address(migration), 500 * 1e18);
+        vm.stopPrank();
+
+        // Check that the random token is in the migration contract
+        assertEq(randomToken.balanceOf(address(migration)), 500 * 1e18);
+
+        // Withdraw the random token
+        vm.startPrank(owner);
+        migration.withdrawToken(randomToken);
+        vm.stopPrank();
+
+        // Check that the random token is in the owner's account
+        assertEq(randomToken.balanceOf(owner), 500 * 1e18);
+
+        // Check that the random token is no longer in the migration contract
+        assertEq(randomToken.balanceOf(address(migration)), 0);
+    }
+
+    function test_withdrawNativeToken() public {
+        // Initialize the contract migrations
+        vm.startPrank(owner);
+        migration.initialize(address(oldToken), address(newToken), true);
+        vm.stopPrank();
+
+        // Transfer native tokens to the migration contract
+        vm.startPrank(user);
+        vm.deal(address(migration), 1000 * 1e18);
+        vm.stopPrank();
+
+        // Check that the native token is in the migration contract
+        assertEq(address(migration).balance, 1000 * 1e18);
+
+        // Withdraw the native token
+        vm.startPrank(owner);
+        migration.withdrawNativeToken();
+        vm.stopPrank();
+
+        // Check that the native token is in the owner's account
+        assertEq(address(owner).balance, 1000 * 1e18);
+
+        // Check that the native token is no longer in the migration contract
+        assertEq(address(migration).balance, 0);
+    }
 }
